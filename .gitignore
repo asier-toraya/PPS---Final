@@ -1,0 +1,11 @@
+.env
+.env*.local
+.next
+node_modules
+coverage
+reports
+dependency-check-data
+zap-data
+sonarqube-data
+sonarqube-extensions
+sonarqube-logs

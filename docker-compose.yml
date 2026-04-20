@@ -1,0 +1,55 @@
+services:
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "3000:3000"
+
+  sonarqube:
+    image: sonarqube:10.6-community
+    profiles: ["security"]
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+
+  dependency-check:
+    image: owasp/dependency-check:latest
+    profiles: ["security"]
+    working_dir: /src
+    volumes:
+      - ./:/src
+      - ./reports/dependency-check:/report
+      - dependency-check-data:/usr/share/dependency-check/data
+    command: >
+      --scan /src
+      --format HTML
+      --format JSON
+      --out /report
+      --project TenantDesk-Min
+      --disableAssembly
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    profiles: ["security"]
+    depends_on:
+      - app
+    volumes:
+      - ./reports/zap:/zap/wrk
+    command: >
+      zap-baseline.py
+      -t http://app:3000
+      -r zap-baseline.html
+      -J zap-baseline.json
+
+volumes:
+  sonarqube-data:
+  sonarqube-extensions:
+  sonarqube-logs:
+  dependency-check-data:

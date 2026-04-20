@@ -1,0 +1,10 @@
+.next
+node_modules
+reports
+dependency-check-data
+zap-data
+sonarqube-data
+sonarqube-extensions
+sonarqube-logs
+.git
+.env
