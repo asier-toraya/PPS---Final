@@ -401,3 +401,222 @@ Para que funcione necesitas:
 6. Crear una membership para tu usuario.
 7. Rellenar `.env`.
 8. Levantar con Docker.
+
+## 16. Desplegar en Render
+
+Render ejecutara la misma app con el `Dockerfile` del proyecto. Supabase seguira siendo la base de datos y el proveedor de autenticacion.
+
+### 16.1 Subir el proyecto a GitHub
+
+1. Crea un repositorio privado en GitHub.
+2. Sube el proyecto.
+3. Asegurate de no subir `.env`, `node_modules`, `.next` ni `reports`.
+
+Archivos que si deben estar:
+
+```text
+Dockerfile
+docker-compose.yml
+package.json
+package-lock.json
+app/
+components/
+lib/
+supabase/
+scripts/
+.env.example
+README.md
+supabaseguide.md
+```
+
+### 16.2 Crear Web Service en Render
+
+En Render:
+
+1. Entra en `Dashboard`.
+2. Pulsa `New`.
+3. Elige `Web Service`.
+4. Conecta tu cuenta de GitHub.
+5. Selecciona el repositorio privado.
+6. En tipo de despliegue, usa `Docker`.
+7. Render detectara el `Dockerfile`.
+
+Configuracion recomendada:
+
+```text
+Name: tenantdesk-min
+Environment: Docker
+Branch: main
+Root Directory: dejar vacio si el proyecto esta en la raiz
+Dockerfile Path: ./Dockerfile
+```
+
+### 16.3 Variables de entorno en Render
+
+En el Web Service de Render, ve a `Environment` y anade:
+
+```env
+NEXT_PUBLIC_SITE_URL=https://TU-SERVICIO.onrender.com
+NEXT_PUBLIC_SUPABASE_URL=https://TU-PROYECTO.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=TU_ANON_KEY
+NEXT_PUBLIC_OAUTH_PROVIDER=github
+```
+
+No uses comillas alrededor de los valores.
+
+`NEXT_PUBLIC_SITE_URL` debe coincidir exactamente con la URL publica de Render.
+
+### 16.4 Configurar Supabase para Render
+
+En Supabase:
+
+1. Ve a `Authentication`.
+2. Entra en `URL Configuration`.
+3. En `Redirect URLs`, anade:
+
+```text
+https://TU-SERVICIO.onrender.com/auth/callback
+```
+
+4. Si esta app desplegada va a ser tu entorno principal, puedes poner en `Site URL`:
+
+```text
+https://TU-SERVICIO.onrender.com
+```
+
+Puedes mantener tambien la URL local:
+
+```text
+http://localhost:3000/auth/callback
+```
+
+Asi podras usar local y Render a la vez.
+
+### 16.5 Configurar GitHub OAuth para Render
+
+Si usas GitHub como proveedor OAuth, normalmente GitHub solo necesita el callback de Supabase:
+
+```text
+https://TU-PROYECTO.supabase.co/auth/v1/callback
+```
+
+No pongas aqui `/auth/callback` de Render. Ese callback lo usa Supabase para devolver la sesion a tu app.
+
+Valores recomendados en GitHub OAuth App:
+
+```text
+Homepage URL:
+https://TU-SERVICIO.onrender.com
+
+Authorization callback URL:
+https://TU-PROYECTO.supabase.co/auth/v1/callback
+```
+
+### 16.6 Primer despliegue
+
+En Render:
+
+1. Pulsa `Create Web Service`.
+2. Espera a que termine el build.
+3. Abre la URL publica:
+
+```text
+https://TU-SERVICIO.onrender.com
+```
+
+4. Pulsa `Entrar con OAuth 2`.
+5. Comprueba que vuelve correctamente a:
+
+```text
+https://TU-SERVICIO.onrender.com/tickets
+```
+
+Si el usuario ya tiene membership, vera la app. Si no, vera el aviso de membership pendiente.
+
+### 16.7 Crear membership para usuario de Render
+
+Si usas el mismo proveedor OAuth y el mismo usuario que en local, el `auth.users.id` sera el mismo dentro del mismo proyecto Supabase.
+
+Compruebalo con:
+
+```sql
+select
+  id,
+  email,
+  created_at
+from auth.users
+order by created_at desc;
+```
+
+Si el usuario no tiene membership:
+
+```sql
+insert into public.memberships (tenant_id, user_id, role)
+values (
+  'TENANT_UUID',
+  'AUTH_USER_UUID',
+  'tenant_admin'
+);
+```
+
+### 16.8 Comprobaciones en Render
+
+Comprueba:
+
+1. La pagina carga.
+2. El login OAuth redirige correctamente.
+3. `/tickets` no se abre sin sesion.
+4. Un usuario sin membership no puede usar la app.
+5. Un usuario con membership ve tickets.
+6. Un usuario de otro tenant no ve tickets ajenos.
+
+### 16.9 Errores frecuentes en Render
+
+#### Error: vuelve al login o falla el callback
+
+Revisa en Render:
+
+```env
+NEXT_PUBLIC_SITE_URL=https://TU-SERVICIO.onrender.com
+```
+
+Revisa en Supabase `Redirect URLs`:
+
+```text
+https://TU-SERVICIO.onrender.com/auth/callback
+```
+
+#### Error: variables no encontradas
+
+Comprueba que en Render estan definidas:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_SITE_URL
+NEXT_PUBLIC_OAUTH_PROVIDER
+```
+
+Despues de cambiarlas, pulsa `Manual Deploy` > `Deploy latest commit` o redeploy.
+
+#### Error: build falla
+
+Comprueba que:
+
+- `package-lock.json` esta subido.
+- `Dockerfile` esta en la raiz.
+- `Root Directory` esta vacio si el proyecto esta en la raiz del repo.
+- No has subido una estructura con otra carpeta por encima del proyecto.
+
+### 16.10 Nota sobre Docker Compose y Render
+
+Render no usa `docker-compose.yml` para este Web Service. Usa solo el `Dockerfile`.
+
+`docker-compose.yml` queda para:
+
+- levantar localmente la app
+- ejecutar SonarQube local
+- ejecutar Dependency-Check
+- ejecutar ZAP
+
+En produccion Render ejecuta un unico contenedor de la app, que es justo lo que necesita este MVP.
