@@ -77,7 +77,7 @@ Valores para local:
 ```text
 Application name: TenantDesk Min
 Homepage URL: http://localhost:3000
-Authorization callback URL: https://TU-PROYECTO.supabase.co/auth/v1/callback
+Authorization callback URL: https://qwuxnlslwsifemhkhjda.supabase.co/auth/v1/callback
 ```
 
 Importante: GitHub apunta al callback de Supabase, no directamente al callback de Next.js.
