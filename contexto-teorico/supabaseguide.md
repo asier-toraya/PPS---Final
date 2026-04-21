@@ -146,6 +146,7 @@ order by created_at desc;
 ```
 
 Copia el `id` del usuario con el que acabas de iniciar sesion.
+cc89ee93-8183-47b6-98b1-4dd991e2e5a8
 
 ## 8. Crear tenant inicial
 
@@ -158,6 +159,7 @@ returning id, name, plan;
 ```
 
 Copia el `id` devuelto. Sera el `tenant_id`.
+6490fff6-e6fd-4f20-b6a5-0ca164d72825
 
 ## 9. Crear membership inicial tenant_admin
 

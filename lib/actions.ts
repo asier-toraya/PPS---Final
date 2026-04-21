@@ -8,7 +8,7 @@ import type { Role, Ticket, TicketStatus } from "@/lib/types";
 
 export async function signInWithOAuth() {
   const supabase = await createSupabaseServerClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
   const provider = (process.env.NEXT_PUBLIC_OAUTH_PROVIDER ?? "github") as "github" | "google" | "azure";
 
   const { data, error } = await supabase.auth.signInWithOAuth({
