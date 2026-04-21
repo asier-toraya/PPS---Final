@@ -4,9 +4,10 @@ import { updateTicket } from "@/lib/actions";
 import { canEditTicket, requireMembership } from "@/lib/authz";
 import type { Ticket } from "@/lib/types";
 
-export default async function TicketDetailPage({ params }: { params: { id: string } }) {
+export default async function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const routeParams = await params;
   const { supabase, membership } = await requireMembership();
-  const { data, error } = await supabase.from("tickets").select("*").eq("id", params.id).maybeSingle();
+  const { data, error } = await supabase.from("tickets").select("*").eq("id", routeParams.id).maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) notFound();

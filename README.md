@@ -125,6 +125,22 @@ http://localhost:3000
 
 ## FASE 10. Seguridad obligatoria
 
+## Cumplimiento resumido de requisitos de seguridad
+
+- OAuth 2: login delegado en Supabase Auth con proveedor OAuth externo como GitHub. Flujo en `app/login/page.tsx`, `lib/actions.ts` y `app/auth/callback/route.ts`.
+- RBAC: permisos por rol `super_admin`, `tenant_admin`, `support_agent` y `client_user`. Reglas en `lib/authz.ts`.
+- ABAC: decisiones por atributos como `tenant_id`, `assigned_to`, `created_by` y `status`. Enforcement en `lib/authz.ts` y `lib/actions.ts`.
+- Aislamiento multi-tenant: todos los recursos operativos usan `tenant_id` y las consultas quedan limitadas por membership y RLS. Politicas en `supabase/schema.sql`.
+- Prevencion de IDOR: doble capa de control en servidor y base de datos. Aunque un usuario manipule rutas o IDs, RLS bloquea acceso fuera de su tenant.
+- RLS en base de datos: politicas activas sobre `tenants`, `memberships` y `tickets` en `supabase/schema.sql`.
+- Validacion y restricciones: validaciones basicas en servidor y `check constraints` en base de datos para roles, estados y longitudes.
+- Cabeceras de seguridad: `X-Content-Type-Options`, `X-Frame-Options` y `Referrer-Policy` configuradas en `next.config.mjs`.
+- Gestion de secretos: variables de entorno, `.env` o `.env.local` fuera del repositorio y configuracion equivalente en Render. `.gitignore` evita versionar secretos.
+- SAST: SonarQube preparado con `sonar-project.properties` y servicio en `docker-compose.yml`.
+- SCA: OWASP Dependency-Check preparado con `scripts/run-dependency-check.ps1`.
+- DAST: OWASP ZAP preparado con `scripts/run-zap.ps1`.
+- Despliegue seguro: app desplegable en Render con Supabase para autenticacion y base de datos, manteniendo configuracion sensible fuera del codigo.
+
 ### SonarQube
 
 Levantar SonarQube:
@@ -179,6 +195,7 @@ Variables:
 - `NEXT_PUBLIC_SUPABASE_URL`: URL del proyecto Supabase.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: anon key de Supabase.
 - `NEXT_PUBLIC_OAUTH_PROVIDER`: `github`, `google` o `azure`.
+- `SUPABASE_SERVICE_ROLE_KEY`: clave privada de backend para funciones administrativas como buscar usuarios de `auth.users` desde `/admin`.
 
 ## FASE 12. Estructura
 
