@@ -265,3 +265,228 @@ Pendiente razonable:
 - Crear datos iniciales reales en Supabase.
 - Ejecutar analisis y guardar evidencias.
 - Ajustar proveedor OAuth concreto de la defensa.
+
+## Seguridad del proyecto
+
+### OAuth 2 y autenticacion
+
+La autenticacion se implementa con Supabase Auth y un proveedor OAuth externo, normalmente GitHub.
+
+Archivos principales:
+- `app/login/page.tsx`
+- `lib/actions.ts`
+- `app/auth/callback/route.ts`
+- `lib/supabase.ts`
+
+Funcionamiento:
+- El usuario pulsa `Entrar con OAuth 2` en `/login`.
+- La accion `signInWithOAuth` redirige al proveedor OAuth configurado.
+- Tras autenticarse, Supabase devuelve el control a `/auth/callback`.
+- En `app/auth/callback/route.ts` se intercambia el `code` por la sesion con `exchangeCodeForSession`.
+- Si el usuario ya tiene membership, entra en `/tickets`. Si no la tiene, vuelve a `/login?missingMembership=1`.
+
+Esto evita gestionar contrasenas propias en la aplicacion y delega la autenticacion a un proveedor externo.
+
+### Sesion y tokens
+
+La sesion se gestiona con cookies de Supabase en servidor.
+
+Archivos principales:
+- `lib/supabase.ts`
+- `app/auth/callback/route.ts`
+
+Funcionamiento:
+- La app usa `@supabase/ssr` y `cookies()` de Next.js para leer y escribir la sesion.
+- Los tokens no se guardan manualmente en el codigo ni en `localStorage`.
+- La sesion se reutiliza en Server Components y Server Actions para consultar Supabase con la identidad del usuario autenticado.
+
+### Autorizacion RBAC
+
+El proyecto define cuatro roles:
+- `super_admin`
+- `tenant_admin`
+- `support_agent`
+- `client_user`
+
+Archivos principales:
+- `lib/types.ts`
+- `lib/authz.ts`
+- `app/admin/page.tsx`
+
+Funcionamiento:
+- `super_admin` tiene visibilidad global.
+- `tenant_admin` administra memberships y tickets de su tenant.
+- `support_agent` trabaja solo sobre tickets asignados a el.
+- `client_user` crea tickets y consulta solo los que le corresponden.
+
+La aplicacion no se limita a ocultar botones: las decisiones de permisos se comprueban en servidor.
+
+### Autorizacion ABAC
+
+Ademas del rol, se usan atributos del recurso y del contexto para decidir acceso.
+
+Archivos principales:
+- `lib/authz.ts`
+- `lib/actions.ts`
+- `supabase/schema.sql`
+
+Atributos usados:
+- `tenant_id`
+- `assigned_to`
+- `created_by`
+- `status`
+
+Ejemplos:
+- un `support_agent` solo puede ver y editar tickets asignados a su `user.id`
+- un `client_user` solo puede ver tickets creados por su `user.id`
+- un ticket cerrado no puede reabrirse por cualquier rol
+
+### Aislamiento multi-tenant
+
+El proyecto usa aislamiento por fila con `tenant_id`.
+
+Archivos principales:
+- `supabase/schema.sql`
+- `lib/authz.ts`
+- `app/tickets/page.tsx`
+- `app/tickets/[id]/page.tsx`
+
+Funcionamiento:
+- `memberships` enlaza usuario, tenant y rol.
+- `tickets` guarda `tenant_id` en cada fila.
+- La app inserta tickets con el `tenant_id` de la membership activa.
+- Las consultas se hacen con la sesion real del usuario.
+- Supabase aplica RLS y solo devuelve filas permitidas.
+
+Esto evita acceso cruzado entre tenants y refuerza la prevencion de IDOR.
+
+### RLS y enforcement en base de datos
+
+La seguridad importante no depende solo de la interfaz o del backend de Next.js. Tambien se aplica en PostgreSQL mediante Row Level Security.
+
+Archivo principal:
+- `supabase/schema.sql`
+
+Funcionamiento:
+- Hay politicas RLS sobre `tenants`, `memberships` y `tickets`.
+- La policy `tickets_select` limita la visibilidad segun rol y atributos.
+- `tenant_admin` ve todos los tickets de su tenant.
+- `support_agent` ve solo tickets asignados a el.
+- `client_user` ve solo tickets creados por el.
+- `super_admin` ve todo.
+
+Aunque un usuario cambie una URL o intente consultar un `id` ajeno, la base de datos no devuelve la fila si no cumple la policy.
+
+### Validacion y controles en servidor
+
+La aplicacion valida datos y aplica controles antes de escribir en la base.
+
+Archivos principales:
+- `lib/actions.ts`
+- `lib/authz.ts`
+
+Funcionamiento:
+- `requireMembership()` exige sesion y membership antes de usar la app.
+- `createTicket()` valida titulo y descripcion.
+- `createMembership()` comprueba que solo perfiles autorizados creen memberships.
+- `assertAllowedStatusChange()` bloquea cambios de estado no permitidos.
+
+Esto evita confiar solo en el cliente o en el HTML del formulario.
+
+### Restricciones en la base de datos
+
+El esquema SQL incluye restricciones estructurales para reducir errores y datos invalidos.
+
+Archivo principal:
+- `supabase/schema.sql`
+
+Ejemplos:
+- `check` para roles validos
+- `check` para estados validos
+- limites de longitud para `title` y `description`
+- claves foraneas para `tenant_id`, `user_id`, `created_by` y `assigned_to`
+- `unique (tenant_id, user_id)` en memberships
+
+### Cabeceras de seguridad
+
+La app aplica cabeceras HTTP basicas de endurecimiento.
+
+Archivo principal:
+- `next.config.mjs`
+
+Cabeceras configuradas:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+
+Estas medidas reducen riesgos de interpretacion incorrecta de contenido, clickjacking y fuga innecesaria de referer.
+
+### Gestion de secretos
+
+Los secretos no se guardan en el codigo.
+
+Archivos principales:
+- `.env.example`
+- `.gitignore`
+- `docker-compose.yml`
+- `README.md`
+
+Variables usadas:
+- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_OAUTH_PROVIDER`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Funcionamiento:
+- `.env` y `.env.local` no se versionan.
+- Render almacena secretos en `Environment`.
+- Supabase almacena la configuracion del proveedor OAuth.
+- `SUPABASE_SERVICE_ROLE_KEY` solo se usa en servidor para funciones administrativas como buscar usuarios desde `/admin`.
+
+### SAST, SCA y DAST
+
+El proyecto queda preparado para analisis de seguridad obligatorios.
+
+#### SonarQube
+
+Archivos principales:
+- `sonar-project.properties`
+- `docker-compose.yml`
+
+Funcionamiento:
+- analiza codigo fuente de `app`, `components` y `lib`
+- ayuda a detectar bugs, code smells y patrones inseguros
+
+#### OWASP Dependency-Check
+
+Archivos principales:
+- `scripts/run-dependency-check.ps1`
+- `docker-compose.yml`
+
+Funcionamiento:
+- analiza dependencias del proyecto
+- genera informes HTML y JSON en `reports/dependency-check`
+
+#### OWASP ZAP
+
+Archivos principales:
+- `scripts/run-zap.ps1`
+- `docker-compose.yml`
+
+Funcionamiento:
+- lanza un analisis baseline contra la app en ejecucion
+- genera informes HTML y JSON en `reports/zap`
+
+### Resumen de seguridad
+
+La seguridad del proyecto se basa en varias capas:
+- autenticacion externa con OAuth 2
+- sesion gestionada en servidor
+- autorizacion RBAC y ABAC
+- aislamiento multi-tenant por `tenant_id`
+- RLS en base de datos
+- validacion en servidor y restricciones SQL
+- secretos fuera del codigo
+- cabeceras seguras
+- preparacion real para SAST, SCA y DAST
