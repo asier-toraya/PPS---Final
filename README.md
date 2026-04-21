@@ -36,8 +36,8 @@ Usuarios entran por OAuth 2 y se enlazan a tenants mediante `memberships`.
 Acciones por rol:
 - `super_admin`: ve tickets y memberships de todos los tenants.
 - `tenant_admin`: gestiona memberships y tickets de su tenant.
-- `support_agent`: ve tickets de su tenant y edita solo tickets asignados a el.
-- `client_user`: crea tickets y consulta tickets permitidos de su tenant.
+- `support_agent`: ve y edita solo tickets asignados a el.
+- `client_user`: crea tickets y solo consulta los tickets creados por el.
 
 RBAC: el rol decide si puede administrar, crear o editar.
 
@@ -104,6 +104,8 @@ Codigo principal:
 
 Ejemplos:
 - `tenant_id` evita acceso cruzado.
+- `support_agent` solo ve tickets asignados a su `user.id`.
+- `client_user` solo ve tickets creados por su `user.id`.
 - `support_agent` edita solo si `ticket.assigned_to === user.id`.
 - `support_agent` no puede reabrir tickets cerrados; eso queda para `tenant_admin` o `super_admin`.
 - `tenant_admin` administra solo su tenant.

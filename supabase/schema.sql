@@ -105,8 +105,15 @@ create policy tickets_select on public.tickets
 for select using (
   public.is_super_admin()
   or exists (
-    select 1 from public.memberships m
-    where m.tenant_id = tickets.tenant_id and m.user_id = auth.uid()
+    select 1
+    from public.memberships m
+    where m.tenant_id = tickets.tenant_id
+    and m.user_id = auth.uid()
+    and (
+      m.role = 'tenant_admin'
+      or (m.role = 'support_agent' and tickets.assigned_to = auth.uid())
+      or (m.role = 'client_user' and tickets.created_by = auth.uid())
+    )
   )
 );
 

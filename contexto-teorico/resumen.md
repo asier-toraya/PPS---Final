@@ -57,3 +57,6 @@
 - Ejecutar ZAP y guardar evidencias.
 - Desplegar en Render y verificar el login OAuth en producción.
 - Dejar capturas y resultados listos para la defensa.
+
+
+Necesito poder asignar a los usuarios a ciertos tickets antes del punto de entrada del controlador con la idea de que solo ciertos usuarios puedan ver ciertos tickets, ABAC y RBAC. 
